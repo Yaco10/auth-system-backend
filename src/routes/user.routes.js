@@ -8,9 +8,12 @@ const router = express.Router()
 //register
 router.post('/register', async(req,res) => {
     try{
-        const { nombre, password, mail } = req.body
-        const newUser = new User({ nombre, password, mail })
+        const { name, password, mail } = req.body
+        const newUser = new User({ name, password, mail })
         await newUser.save()
+        res.status(200).json({
+            message: 'Se registro exitosamente'
+        })
     }
     catch(error){
         res.status(500).json({ error: error.message })
@@ -18,17 +21,23 @@ router.post('/register', async(req,res) => {
 })
 
 //login
-router.post('login', async(req,res) => {
+router.post('/login', async(req,res) => {
     try{
-        const { nombre, password } = req.body
-        const user = await User.findOne({ nombre })
-        if(!user) return res.json(400).json({ message: 'El usuario no fue encontrado'})
+        const { name, password } = req.body
+        const user = await User.findOne({ name })
+        if(!user) {
+            return res.status(400).json({ message: 'El usuario no fue encontrado'})
+        }
         
-        const isMatch = bcrypt.compare(password, user.password)
-        if(!isMatch) return res.status(401).json({message: 'Contraseña Incorrecta'})
+        const isMatch = await bcrypt.compare(password, user.password)
+        if(!isMatch) {
+            return res.status(401).json({message: 'Contraseña Incorrecta'})
+        }
 
+        
         const token = jwt.sign({ id: user._id }, 'secreto', { expiresIn: '24h' });
-        res.json({ token });
+        res.status(200).json({ message: 'Logueado correctamente', token });
+        
     }
     catch(error){
         res.status(500).json({
@@ -40,14 +49,26 @@ router.post('login', async(req,res) => {
 //ruta protegida
 router.get('/perfil', async(req,res)=>{
     const token = req.headers.authorization;
-    if (!token) return res.status(401).json({ message: 'No autorizado' });
     
-    try{
-        const decoded = jwt.verify(token,'secreto');
-        const user = await User.findById(dedode.id).select('-password')
+
+    // Verificar que el token esté presente después de eliminar 'Bearer'.
+    if (!token) {
+        return res.status(401).json({ message: 'Token no válido' });
+    }
+
+    try {
+        // Verificar y decodificar el token.
+        const decoded = jwt.verify(token, 'secreto');
+        console.log('Token decodificado:', decoded);
+        const user = await User.findById(decoded.id).select('-password')
         res.json(user);
-    } catch(error){
-        res.status(401).json({ message: 'Token invalido' })
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expirado' });
+        }
+
+        console.log('Error al verificar token:', error);
+        return res.status(401).json({ message: 'Token inválido' });
     }
 })
 
