@@ -8,9 +8,28 @@ const router = express.Router()
 //register
 router.post('/register', async(req,res) => {
     try{
-        const { nombre, password, mail } = req.body
-        const newUser = new User({ nombre, password, mail })
+        const { name, password, mail } = req.body
+
+        if (!name || !password || !mail) {
+            return res.status(400).json({ error: "Todos los campos son obligatorios" });
+        }
+
+        // Verificar que el correo no sea nulo ni vacío
+        if (!mail || mail.trim() === "") {
+            return res.status(400).json({ error: "El correo electrónico no puede estar vacío" });
+        }
+
+        // Verificar si el correo ya está registrado
+        const existingUser = await User.findOne({ mail });
+        if (existingUser) {
+            return res.status(400).json({ error: "El correo electrónico ya está registrado" });
+        }
+
+        const newUser = new User({ name, password, mail })
         await newUser.save()
+
+        res.status(201).json({ message: "Usuario registrado exitosamente" });
+        
     }
     catch(error){
         res.status(500).json({ error: error.message })
