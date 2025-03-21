@@ -9,35 +9,19 @@ const router = express.Router()
 router.post('/register', async(req,res) => {
     try{
         const { name, password, mail } = req.body
-<<<<<<< HEAD
 
-        if (!name || !password || !mail) {
-            return res.status(400).json({ error: "Todos los campos son obligatorios" });
-        }
-
-        // Verificar que el correo no sea nulo ni vacío
-        if (!mail || mail.trim() === "") {
-            return res.status(400).json({ error: "El correo electrónico no puede estar vacío" });
-        }
-
-        // Verificar si el correo ya está registrado
+        // Verificar si el usuario ya existe
         const existingUser = await User.findOne({ mail });
         if (existingUser) {
-            return res.status(400).json({ error: "El correo electrónico ya está registrado" });
+            return res.status(400).json({ error: "El email ya está registrado" });
         }
 
-        const newUser = new User({ name, password, mail })
-        await newUser.save()
-
-        res.status(201).json({ message: "Usuario registrado exitosamente" });
-        
-=======
         const newUser = new User({ name, password, mail })
         await newUser.save()
         res.status(200).json({
             message: 'Se registro exitosamente'
         })
->>>>>>> 24cd4f9a39671ffc72522d5249448072bc000ba7
+
     }
     catch(error){
         res.status(500).json({ error: error.message })
@@ -47,8 +31,8 @@ router.post('/register', async(req,res) => {
 //login
 router.post('/login', async(req,res) => {
     try{
-        const { name, password } = req.body
-        const user = await User.findOne({ name })
+        const { mail, password } = req.body
+        const user = await User.findOne({ mail })
         if(!user) {
             return res.status(400).json({ message: 'El usuario no fue encontrado'})
         }
