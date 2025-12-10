@@ -1,7 +1,2 @@
-mongo
-<<<<<<< HEAD
-node_modules/
 .env
-=======
 node_modules/
->>>>>>> 24cd4f9a39671ffc72522d5249448072bc000ba7

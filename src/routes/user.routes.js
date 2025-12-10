@@ -1,83 +1,132 @@
-import express from "express";
-import  User  from "../models/user.model.js"
-import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
-
+const express = require('express')
 const router = express.Router()
+const User = require("../modules/user.model")
 
-//register
-router.post('/register', async(req,res) => {
-    try{
-        const { name, password, mail } = req.body
+//MIDDLEWARE
+const getUser = async(req,res,next) => {
+    let user;
+    const { id } = req.params;
 
-        // Verificar si el usuario ya existe
-        const existingUser = await User.findOne({ mail });
-        if (existingUser) {
-            return res.status(400).json({ error: "El email ya está registrado" });
-        }
-
-        const newUser = new User({ name, password, mail })
-        await newUser.save()
-        res.status(200).json({
-            message: 'Se registro exitosamente'
+    if(!id.match(/^[0-9a-fA-F]{24}$/)){
+        return res.status(404).json({
+            message: 'El id no es valido'
         })
-
     }
-    catch(error){
-        res.status(500).json({ error: error.message })
-    }
-})
 
-//Login
-router.post('/login', async(req,res) => {
     try{
-        const { mail, password } = req.body
-        const user = await User.findOne({ mail })
-        if(!user) {
-            return res.status(400).json({ message: 'El usuario no fue encontrado'})
+        user = await User.findById(id)
+        if(!user){
+            return res.status(404).json({
+                message: 'el libro no fue encontrado'
+            })
         }
-        
-        const isMatch = await bcrypt.compare(password, user.password)
-        if(!isMatch) {
-            return res.status(401).json({message: 'Contraseña Incorrecta'})
-        }
-
-        
-        const token = jwt.sign({ id: user._id }, 'secreto', { expiresIn: '24h' });
-        res.status(200).json({ message: 'Logueado correctamente', token });
-        
-    }
-    catch(error){
-        res.status(500).json({
+    } catch(error){
+        return res.status(500).json({
             message: error.message
         })
     }
-})
+    res.user = user
+    next()
+}
 
-//ruta protegida
-router.get('/perfil', async(req,res)=>{
-    const token = req.headers.authorization;
-    
-
-    // Verificar que el token esté presente después de eliminar 'Bearer'.
-    if (!token) {
-        return res.status(401).json({ message: 'Token no válido' });
-    }
-
-    try {
-        // Verificar y decodificar el token.
-        const decoded = jwt.verify(token, 'secreto');
-        console.log('Token decodificado:', decoded);
-        const user = await User.findById(decoded.id).select('-password')
-        res.json(user);
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Token expirado' });
+//GET ALL
+router.get('/',async (req, res) => {
+    try{
+        const users = await User.find()
+        console.log('GET ALL',users)
+        if(users.length == 0){
+           return res.status(200).json([])
         }
-
-        console.log('Error al verificar token:', error);
-        return res.status(401).json({ message: 'Token inválido' });
+        return res.json(users)
+    }
+    catch(error) {
+        res.status(500).json({ message: error.message })
     }
 })
 
-export default router
+//GET ONE
+router.get('/:id', getUser,async (req, res) => {
+    res.json(res.user)
+})
+
+//PUT
+router.put('/:id', getUser,async (req, res) => {
+    try{
+        const user = res.user
+        user.name = req.body.name || user.password
+        user.password = req.body.password || user.password
+        user.email = req.body.email || user.email
+        user.roles = req.body.roles || user.roles
+        let updateUser = await user.save()
+        res.json(updateUser)
+        
+    } catch (error){
+        res.status(400).json({ message: error.message })
+    }
+})
+
+//POST
+router.post('/', async (req, res) => {
+    const { name, password, email, roles, createdAt } = req.body
+    if(!name || !password || !email || !roles ){
+        return res.status(400).json({
+            message: 'todos los campos deben completarse'
+        })
+    }
+
+    const user = new User(
+        {
+            name: name,
+            password: password,
+            email: email,
+            roles: roles,
+            createdAt: createdAt
+        }
+    )
+
+    try{
+        const newUser = await user.save()
+        console.log("Usuario Creado", newUser)
+        res.status(201).json(newUser)
+    } catch(error){
+        res.status(400).json({ message: error.message})
+    }
+})
+
+//PATCH
+router.patch('/:id', getUser,async (req, res) => {
+
+    if(!req.body.name && !req.body.password && !req.body.email && !req.body.roles){
+        res.status(404).json({ message: 'Alguno de los campos debe ser enviado'})
+    }
+
+    try{
+        const user = res.user
+        user.name = req.body.name || user.password
+        user.password = req.body.password || user.password
+        user.email = req.body.email || user.email
+        user.roles = req.body.roles || user.roles
+        let updateUser = await user.save()
+        res.json(updateUser)
+        
+    } catch (error){
+        res.status(400).json({ message: error.message })
+    }
+})
+
+//DELETE
+router.delete('/:id', getUser,async (req, res) => {
+    try{
+
+        const user = res.user
+        await user.deleteOne({ _id: user._id })
+        res.json({
+            message: `El libro ${user.title} ha sido eliminado correctamente`
+        })
+    }
+    catch (error){
+        res.status(500).json({ message: error.message })
+    }
+})
+
+module.exports = router
